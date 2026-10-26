@@ -1,0 +1,50 @@
+// ===== Manufacturing Downtime & OEE: DAX measures =====
+// Tables: fact_machine_day, dim_machine, fact_events, loss_tree, downtime_pareto, risk_scores, hypothesis_tests,
+//         errors_before_failures, dim_date
+// Relationships: dim_machine[machineID] 1-* fact_machine_day[machineID], fact_events[machineID], risk_scores[machineID]
+//                dim_date[Date] 1-* fact_machine_day[date]; dim_date[Date] 1-* fact_events[event_date]
+
+// ---------- OEE ----------
+Planned Hours = SUM ( fact_machine_day[planned_hours] )
+Run Hours = SUM ( fact_machine_day[run_hours] )
+Availability % = DIVIDE ( [Run Hours], [Planned Hours] )
+Performance % = DIVIDE ( SUM ( fact_machine_day[output] ), SUM ( fact_machine_day[ideal_output] ) )
+Quality % = DIVIDE ( SUM ( fact_machine_day[good_output] ), SUM ( fact_machine_day[output] ) )
+OEE % = [Availability %] * [Performance %] * [Quality %]
+World Class Gap (pts) = ( 0.85 - [OEE %] ) * 100
+
+// ---------- Output & quality ----------
+Production Output = SUM ( fact_machine_day[good_output] )
+Total Output = SUM ( fact_machine_day[output] )
+Scrap Units = SUM ( fact_machine_day[scrap] )
+Defect Rate % = DIVIDE ( [Scrap Units], [Total Output] )
+
+// ---------- Downtime ----------
+Breakdown Hours = SUM ( fact_machine_day[breakdown_hours] )
+Minor Stop Hours = SUM ( fact_machine_day[minor_stop_hours] )
+Downtime Hours = [Breakdown Hours] + [Minor Stop Hours]
+Planned Maintenance Hours = SUM ( fact_machine_day[planned_maintenance_hours] )
+Downtime per Machine = DIVIDE ( [Downtime Hours], DISTINCTCOUNT ( fact_machine_day[machineID] ) )
+Lost Units = [Planned Hours] * 100 - [Production Output]
+
+// ---------- Reliability ----------
+Breakdowns = CALCULATE ( COUNTROWS ( fact_events ), fact_events[event] = "Breakdown" )
+Error Alarms = CALCULATE ( COUNTROWS ( fact_events ), fact_events[event] = "Error alarm" )
+MTBF (hours) = DIVIDE ( [Run Hours], [Breakdowns] )
+Reactive Maintenance % =
+    DIVIDE (
+        CALCULATE ( COUNTROWS ( fact_events ), fact_events[event] = "Repair" ),
+        CALCULATE ( COUNTROWS ( fact_events ), fact_events[event] IN { "Repair", "Planned replacement" } ) )
+
+// ---------- Pareto (on downtime_pareto) ----------
+Cause Hours = SUM ( downtime_pareto[downtime_hours] )
+Cause Rank = RANKX ( ALL ( downtime_pareto[cause] ), [Cause Hours], , DESC, DENSE )
+Cumulative Cause % =
+    VAR r = [Cause Rank]
+    RETURN DIVIDE (
+        CALCULATE ( [Cause Hours], FILTER ( ALL ( downtime_pareto[cause] ), [Cause Rank] <= r ) ),
+        CALCULATE ( [Cause Hours], ALL ( downtime_pareto[cause] ) ) )
+
+// ---------- Risk ----------
+Machines at High Risk = CALCULATE ( COUNTROWS ( risk_scores ), risk_scores[risk] >= 0.42 )
+Average Risk = AVERAGE ( risk_scores[risk] )

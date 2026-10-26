@@ -1,0 +1,6 @@
+,rate_ratio,ci_low,ci_high,p_value
+Model model2 vs model1,0.8484,0.6882,1.0459,0.1236
+Model model3 vs model1,0.6007,0.4913,0.7345,0.0
+Model model4 vs model1,0.5817,0.4715,0.7176,0.0
+Machine age (per year),1.0308,1.0172,1.0445,0.0
+Error alarms (each),1.0249,1.0142,1.0358,0.0

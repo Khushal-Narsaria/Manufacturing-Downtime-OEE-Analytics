@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Manufacturing Downtime &amp; OEE</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root { --bg:#f4f6f7; --card:#fff; --ink:#1b2328; --muted:#5a6670; --line:#e0e5e8; --accent:#0f6f6a; --good:#1e8a4c; --warn:#d07a12; --bad:#c23b3b; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; background:var(--bg); color:var(--ink); }
+  header { background:#12302f; color:#fff; padding:22px 24px; }
+  header h1 { margin:0 0 6px; font-size:22px; }
+  header p { margin:0; color:#c7dedc; font-size:14px; max-width:940px; line-height:1.5; }
+  main { max-width:1180px; margin:0 auto; padding:18px 16px 40px; }
+  .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(122px,1fr)); gap:10px; margin-bottom:14px; }
+  .kpi { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:12px; }
+  .kpi .l { font-size:11.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
+  .kpi .v { font-size:22px; font-weight:700; margin:4px 0 2px; }
+  .kpi .s { font-size:12px; color:var(--muted); }
+  .tabs { display:flex; gap:6px; flex-wrap:wrap; margin:4px 0 16px; }
+  .tabs button { border:1px solid var(--line); background:#fff; padding:8px 14px; border-radius:20px; cursor:pointer; font-size:14px; color:var(--ink); }
+  .tabs button.on { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(420px,1fr)); gap:14px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; min-width:0; }
+  .card h2 { font-size:15px; margin:0 0 4px; }
+  .note { font-size:13px; color:var(--muted); margin:0 0 10px; line-height:1.45; }
+  .insight { background:#e8f3f2; border-left:4px solid var(--accent); padding:10px 12px; border-radius:6px; font-size:13.5px; line-height:1.5; margin-top:10px; }
+  .recs { margin:0; padding-left:20px; font-size:14px; line-height:1.6; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th, td { text-align:left; padding:7px 6px; border-bottom:1px solid var(--line); }
+  th { color:var(--muted); font-weight:600; font-size:12px; }
+  td.n, th.n { text-align:right; white-space:nowrap; }
+  .scroll { overflow-x:auto; }
+  .hide { display:none; }
+  .yes { color:var(--good); font-weight:600; } .no { color:var(--bad); font-weight:600; }
+  canvas { max-height:300px; }
+  footer { color:var(--muted); font-size:12.5px; text-align:center; margin-top:26px; line-height:1.6; }
+  @media (max-width:520px){ .grid { grid-template-columns:1fr; } header h1{font-size:19px;} }
+</style>
+</head>
+<body>
+<header>
+  <h1>Manufacturing Downtime &amp; OEE Analytics</h1>
+  <p>Why are machines losing productive time, and which failures cause the most downtime? 100 machines, 876,100 machine-hours of sensor data, 761 breakdowns and 3,919 error alarms in 2015.</p>
+</header>
+<main>
+  <div class="kpis" id="kpis"></div>
+  <div class="tabs" id="tabs">
+    <button data-t="oee" class="on">OEE</button>
+    <button data-t="downtime">Downtime Pareto</button>
+    <button data-t="reliability">Reliability &amp; patterns</button>
+    <button data-t="risk">Downtime risk forecast</button>
+    <button data-t="stats">Statistics</button>
+    <button data-t="data">Data &amp; assumptions</button>
+  </div>
+
+  <section id="oee">
+    <div class="card" style="margin-bottom:14px"><h2>What to fix first</h2><ol class="recs" id="recs"></ol></div>
+    <div class="grid">
+      <div class="card"><h2>Where production is lost</h2><p class="note">Lost units by OEE loss category (share of all losses).</p><canvas id="cLoss"></canvas><div class="insight" id="iLoss"></div></div>
+      <div class="card"><h2>OEE by month</h2><p class="note">Availability, performance and quality multiply into OEE.</p><canvas id="cOee"></canvas></div>
+      <div class="card"><h2>OEE by machine model</h2><canvas id="cModel"></canvas><div class="insight" id="iModel"></div></div>
+      <div class="card"><h2>Downtime and output by month</h2><canvas id="cDown"></canvas></div>
+    </div>
+  </section>
+
+  <section id="downtime" class="hide">
+    <div class="grid">
+      <div class="card"><h2>Downtime Pareto by cause</h2><p class="note">Breakdown and minor-stop hours, largest first, with the cumulative share.</p><canvas id="cPareto"></canvas><div class="insight" id="iPareto"></div></div>
+      <div class="card"><h2>Lost production by machine</h2><p class="note">Cumulative share of all lost units against the share of machines, worst first.</p><canvas id="cCurve"></canvas><div class="insight" id="iCurve"></div></div>
+      <div class="card"><h2>Machines losing the most production</h2><div class="scroll"><table id="tMach"></table></div></div>
+      <div class="card"><h2>Breakdowns by month</h2><canvas id="cFm"></canvas></div>
+    </div>
+  </section>
+
+  <section id="reliability" class="hide">
+    <div class="grid">
+      <div class="card"><h2>Mean time between failures</h2><p class="note">Running hours per failure for one machine, by component and by machine model.</p><canvas id="cMtbf"></canvas><div class="insight" id="iMtbf"></div></div>
+      <div class="card"><h2>Each failure has a warning alarm</h2><p class="note">Share of failures with that error alarm in the 24 hours before, against the chance of the alarm in any 24 hours.</p><div class="scroll"><table id="tLift"></table></div><div class="insight" id="iLift"></div></div>
+      <div class="card"><h2>Failed parts were overdue</h2><p class="note">Days since the component was last replaced: at a failure vs at a planned replacement.</p><canvas id="cRep"></canvas><div class="insight" id="iRep"></div></div>
+      <div class="card"><h2>Older machines fail more</h2><p class="note">Average breakdowns per machine in 2015 by machine age (years).</p><canvas id="cAge"></canvas></div>
+    </div>
+    <div class="card" style="margin-top:14px"><h2>Running conditions in the 3 days around a failure</h2><div class="scroll"><table id="tSens"></table></div><div class="insight" id="iSens"></div></div>
+  </section>
+
+  <section id="risk" class="hide">
+    <div class="grid">
+      <div class="card"><h2>Will a machine break down in the next 24 hours?</h2><p class="note">Gradient boosting trained on Jan-Aug 2015, alert threshold set on September, tested once on Oct-Dec 2015 (180 breakdowns).</p><div class="scroll"><table id="tRisk"></table></div><div class="insight" id="iRisk"></div></div>
+      <div class="card"><h2>What the sensors-only model relies on</h2><p class="note">Drop in ROC AUC when one input is shuffled.</p><canvas id="cImp"></canvas></div>
+    </div>
+    <div class="card" style="margin-top:14px"><h2>Inspection list: highest risk now</h2><p class="note">Latest 24-hour risk score per machine (sensors-only model) with days since each component was replaced.</p><div class="scroll"><table id="tNow"></table></div></div>
+  </section>
+
+  <section id="stats" class="hide">
+    <div class="card"><h2>Hypothesis tests</h2><div class="scroll"><table id="tTests"></table></div></div>
+    <div class="card" style="margin-top:14px"><h2>What drives failure frequency? (Poisson regression)</h2><p class="note" id="nReg"></p><div class="scroll"><table id="tReg"></table></div></div>
+  </section>
+
+  <section id="data" class="hide">
+    <div class="grid">
+      <div class="card"><h2>Data checks</h2><div class="scroll"><table id="tQ"></table></div></div>
+      <div class="card"><h2>Assumptions (one place in the code)</h2><p class="note">The source logs breakdowns, alarms and maintenance but not repair times, output or scrap, so these are derived as follows. Change them in <code>src/oee/data.py</code> and re-run.</p><div class="scroll"><table id="tA"></table></div></div>
+    </div>
+  </section>
+
+  <footer>Data: Microsoft Azure Predictive Maintenance sample data (100 machines, 2015; synthetic). Output and scrap are derived from spindle speed and process sensors as described under Data &amp; assumptions.<br>
+  Built with Python, pandas, SQL (SQLite), scikit-learn, SciPy, statsmodels and Chart.js. A Power BI version is described in the repository.</footer>
+</main>
+<script>
+const fmt=(n,d=0)=>Number(n).toLocaleString('en-US',{maximumFractionDigits:d,minimumFractionDigits:d});
+const pc=(n,d=1)=>fmt(n*100,d)+'%';
+const C={t:'#0f6f6a',grey:'#9aa3ab',orange:'#d07a12',red:'#c23b3b',green:'#1e8a4c',blue:'#2f6fd0',purple:'#6a4fc2'};
+Chart.defaults.font.family='system-ui,-apple-system,Segoe UI,Roboto,sans-serif'; Chart.defaults.color='#5a6670';
+const ml=s=>s.slice(0,7);
+fetch('data.json').then(r=>r.json()).then(d=>{
+  const h=d.headline, rs=h.risk_sensors, ra=h.risk_alarms;
+  const K=[['OEE',pc(h.oee),'A x P x Q'],['Availability',pc(h.availability),'run / planned time'],['Performance',pc(h.performance),'actual vs ideal rate'],['Quality',pc(h.quality),'good / total output'],
+    ['Downtime',fmt(h.downtime_hours)+' h',fmt(h.breakdown_hours)+' h breakdowns'],['Output',fmt(h.good_output/1e6,1)+'M','good units'],['Defect rate',pc(h.defect_rate,2),'scrap share of output'],['MTBF',fmt(h.mtbf_hours)+' h','running hours per breakdown']];
+  kpis.innerHTML=K.map(k=>`<div class="kpi"><div class="l">${k[0]}</div><div class="v">${k[1]}</div><div class="s">${k[2]}</div></div>`).join('');
+  const lift=d.error_lift;
+  recs.innerHTML=[
+    `<b>Treat error alarms as a 24-hour warning.</b> ${fmt(Math.min(...lift.map(r=>r.share_with_error_pct)),0)}-${fmt(Math.max(...lift.map(r=>r.share_with_error_pct)),0)}% of breakdowns follow one specific alarm (e.g. error5 before component 4, ${fmt(lift.find(r=>r.component==='comp4').lift,0)}x the normal rate). Dispatch a technician when it fires.`,
+    `<b>Shorten replacement intervals.</b> Failed components had gone a median ${fmt(h.days_since_replacement_at_failure)} days since replacement, against ${fmt(h.days_since_replacement_planned)} days at planned replacements; ${h.reactive_share_pct}% of maintenance is still reactive.`,
+    `<b>Start with component 2.</b> It is the largest downtime cause (${h.top_downtime_cause_pct}% of hours) and fails every ${fmt(h.mtbf_by_component_hours.comp2)} running hours per machine.`,
+    `<b>Prioritise model 1 and older machines.</b> Model 1 breaks down every ${fmt(h.mtbf_by_model_hours.model1)} hours against ${fmt(h.mtbf_by_model_hours.model4)} for model 4; each year of age adds about 3% to failure frequency.`,
+    `<b>Use the risk model for inspections.</b> Using sensors and maintenance history only, it flagged ${rs.failures_caught} of ${rs.test_failures} breakdowns in Oct-Dec a day ahead, with ${rs.false_alerts_per_machine_month} false alerts per machine per month.`
+  ].map(x=>`<li>${x}</li>`).join('');
+
+  const L=d.losses;
+  new Chart(cLoss,{type:'bar',data:{labels:L.map(r=>r.loss),datasets:[{label:'Lost units',data:L.map(r=>r.lost_units),backgroundColor:[C.red,C.orange,C.blue,C.purple]}]},
+    options:{plugins:{legend:{display:false}},indexAxis:'y',scales:{x:{ticks:{callback:v=>fmt(v/1e6,1)+'M'}}}}});
+  const lq=L.find(r=>r.loss.startsWith('Scrap')), ls=L.find(r=>r.loss==='Reduced speed');
+  iLoss.innerHTML=`OEE is <b>${pc(h.oee)}</b>. Breakdowns and minor stops are ${fmt(L[0].share_of_losses_pct+L[1].share_of_losses_pct,1)}% of the losses; scrap (${lq.share_of_losses_pct}%) and slow running (${ls.share_of_losses_pct}%) are larger in units, and both concentrate in the days around a breakdown (Reliability tab).`;
+  const m=d.monthly.filter(r=>r.month<'2016-01-01');
+  new Chart(cOee,{type:'line',data:{labels:m.map(r=>ml(r.month)),datasets:[{label:'OEE',data:m.map(r=>r.oee*100),borderColor:C.t,borderWidth:3},{label:'Availability',data:m.map(r=>r.availability*100),borderColor:C.red,pointRadius:0},{label:'Performance',data:m.map(r=>r.performance*100),borderColor:C.blue,pointRadius:0},{label:'Quality',data:m.map(r=>r.quality*100),borderColor:C.purple,pointRadius:0}]},
+    options:{scales:{y:{suggestedMin:94,suggestedMax:100,ticks:{callback:v=>v+'%'}}}}});
+  const bm=d.by_model;
+  new Chart(cModel,{type:'bar',data:{labels:bm.map(r=>r.model),datasets:[{label:'OEE',data:bm.map(r=>r.oee*100),backgroundColor:C.t},{label:'Quality',data:bm.map(r=>r.quality*100),backgroundColor:C.purple},{label:'Availability',data:bm.map(r=>r.availability*100),backgroundColor:C.red}]},
+    options:{scales:{y:{min:94,max:100,ticks:{callback:v=>v+'%'}}}}});
+  iModel.innerHTML=`Model 1 has the lowest OEE (${pc(bm[0].oee)}) and the highest defect rate (${pc(bm[0].defect_rate,2)}); models 3 and 4 run at ${pc(bm[2].oee)} and ${pc(bm[3].oee)}.`;
+    new Chart(cDown,{data:{labels:m.map(r=>ml(r.month)),datasets:[{type:'bar',label:'Downtime hours',data:d.monthly.filter(r=>r.month<'2016-01-01').map(r=>(r.planned_hours-r.run_hours)),backgroundColor:'rgba(194,59,59,.6)',yAxisID:'y'},{type:'line',label:'Good output per day (k units)',data:m.map(r=>r.good_output/1000/new Date(new Date(r.month).getFullYear(),new Date(r.month).getMonth()+1,0).getDate()),borderColor:C.t,yAxisID:'y1'}]},
+    options:{scales:{y:{title:{display:true,text:'downtime hours'}},y1:{position:'right',grid:{drawOnChartArea:false},suggestedMin:200,suggestedMax:240}}}});
+
+  const P=d.downtime_pareto;
+  new Chart(cPareto,{data:{labels:P.map(r=>r.cause.replace('Breakdown: ','Breakdown ').replace('Minor stop: ','Stop ')),datasets:[{type:'bar',label:'Downtime hours',data:P.map(r=>r.downtime_hours),backgroundColor:P.map(r=>r.cause.startsWith('Breakdown')?C.red:C.orange),yAxisID:'y'},{type:'line',label:'Cumulative %',data:P.map(r=>r.cumulative_pct),borderColor:'#1b2328',yAxisID:'y1'}]},
+    options:{scales:{y1:{position:'right',min:0,max:100,grid:{drawOnChartArea:false},ticks:{callback:v=>v+'%'}}}}});
+  iPareto.innerHTML=`Breakdowns are <b>${h.breakdown_share_of_downtime_pct}%</b> of downtime hours. Component 2 alone is ${h.top_downtime_cause_pct}%, and the top three breakdown types reach ${P[2].cumulative_pct}%.`;
+  const cv=d.machine_pareto_curve;
+  new Chart(cCurve,{type:'line',data:{labels:cv.map(r=>r.machines_pct),datasets:[{data:cv.map(r=>r.cum_pct),borderColor:C.t,fill:true,backgroundColor:'rgba(15,111,106,.12)',pointRadius:0}]},
+    options:{plugins:{legend:{display:false}},scales:{x:{title:{display:true,text:'% of machines'},ticks:{maxTicksLimit:10}},y:{max:100,ticks:{callback:v=>v+'%'}}}}});
+  iCurve.innerHTML=`Losses are spread fairly evenly: ${h.machines_for_half_of_losses} of 100 machines account for half of the lost units, so fleet-wide fixes (alarms, replacement intervals) matter more than a few problem machines.`;
+  tMach.innerHTML='<tr><th>Machine</th><th>Model</th><th class="n">Age</th><th class="n">Breakdowns</th><th class="n">Lost units</th><th class="n">Share</th></tr>'+d.top_machines.map(r=>`<tr><td>M-${r.machineID}</td><td>${r.model}</td><td class="n">${r.age}</td><td class="n">${r.failures}</td><td class="n">${fmt(r.lost_units)}</td><td class="n">${r.share_pct}%</td></tr>`).join('');
+  const fm=d.failures_by_month;
+  new Chart(cFm,{type:'bar',data:{labels:fm.map(r=>ml(r.month)),datasets:[{label:'Breakdowns',data:fm.map(r=>r.failures),backgroundColor:C.red}]},options:{plugins:{legend:{display:false}}}});
+
+  const mc=d.mtbf_component, mo=d.mtbf_model;
+  new Chart(cMtbf,{type:'bar',data:{labels:[...mc.map(r=>r.component),...mo.map(r=>r.model)],datasets:[{label:'MTBF (hours)',data:[...mc.map(r=>r.mtbf_hours),...mo.map(r=>r.mtbf_hours)],backgroundColor:[...mc.map(()=>C.orange),...mo.map(()=>C.t)]}]},options:{plugins:{legend:{display:false}}}});
+  iMtbf.innerHTML=`A machine breaks down every <b>${fmt(h.mtbf_hours)} running hours</b> (about ${fmt(h.mtbf_hours/24)} days) on average. Component 2 is the weakest part (every ${fmt(mc[0].mtbf_hours)} hours) and model 1 the least reliable machine type.`;
+  tLift.innerHTML='<tr><th>Component</th><th>Warning alarm</th><th class="n">Failures</th><th class="n">With alarm</th><th class="n">By chance</th><th class="n">Lift</th></tr>'+lift.map(r=>`<tr><td>${r.component}</td><td>${r.error}</td><td class="n">${r.failures}</td><td class="n">${r.share_with_error_pct}%</td><td class="n">${r.baseline_pct}%</td><td class="n">${fmt(r.lift,0)}x</td></tr>`).join('');
+  iLift.innerHTML=`Every component has its own warning alarm, which fires before almost every failure of that part. This is the clearest recurring pattern in the data.`;
+  const bins=[0,15,30,45,60,75,90,105,120,150,200,500], lab=bins.slice(0,-1).map((b,i)=>`${b}-${bins[i+1]}`);
+  const hist=a=>{const c=new Array(lab.length).fill(0);a.forEach(v=>{for(let i=0;i<lab.length;i++){if(v>=bins[i]&&v<bins[i+1]){c[i]++;break;}}});const s=a.length;return c.map(x=>x/s*100);};
+  new Chart(cRep,{type:'bar',data:{labels:lab,datasets:[{label:'Planned replacement',data:hist(d.replacement_age.planned),backgroundColor:'rgba(30,138,76,.7)'},{label:'Failure',data:hist(d.replacement_age.failed),backgroundColor:'rgba(194,59,59,.7)'}]},options:{scales:{y:{ticks:{callback:v=>v+'%'}},x:{title:{display:true,text:'days since last replacement'}}}}});
+  iRep.innerHTML=`Parts that failed had been in service for a median <b>${fmt(h.days_since_replacement_at_failure)} days</b>, against ${fmt(h.days_since_replacement_planned)} at planned replacements. Replacing on schedule before about 45 days would prevent most breakdowns.`;
+  const ag=d.failures_by_age;
+  new Chart(cAge,{type:'bar',data:{labels:ag.map(r=>r.age),datasets:[{label:'Breakdowns per machine',data:ag.map(r=>r.avg_failures),backgroundColor:C.t}]},options:{plugins:{legend:{display:false}},scales:{x:{title:{display:true,text:'machine age (years)'}}}}});
+  tSens.innerHTML='<tr><th>Sensor</th><th class="n">Normal running</th><th class="n">Within 3 days of a failure</th><th class="n">Change</th></tr>'+d.sensors_near_failure.map(r=>`<tr><td>${r.sensor}</td><td class="n">${fmt(r.normal,1)}</td><td class="n">${fmt(r.within_3_days_of_failure,1)}</td><td class="n">${r.within_3_days_of_failure>r.normal?'+':''}${fmt((r.within_3_days_of_failure/r.normal-1)*100,1)}%</td></tr>`).join('');
+  iSens.innerHTML=`Before a breakdown machines run slower and vibrate more, and out-of-spec (scrap) hours rise from ${h.scrap_rate_normal_pct}% to ${h.scrap_rate_near_failure_pct}%, so breakdowns also drive the quality and speed losses.`;
+
+  tRisk.innerHTML='<tr><th>Method</th><th class="n">AUC</th><th class="n">Precision</th><th class="n">Recall</th><th class="n">Breakdowns caught</th><th class="n">False alerts per machine-month</th></tr>'+
+    `<tr><td><b>Sensors + maintenance history</b></td><td class="n">${fmt(rs.roc_auc,3)}</td><td class="n">${pc(rs.model_precision)}</td><td class="n">${pc(rs.model_recall)}</td><td class="n">${rs.failures_caught} / ${rs.test_failures}</td><td class="n">${rs.false_alerts_per_machine_month}</td></tr>`+
+    `<tr><td>Same + error alarms</td><td class="n">${fmt(ra.roc_auc,3)}</td><td class="n">${pc(ra.model_precision)}</td><td class="n">${pc(ra.model_recall)}</td><td class="n">${ra.failures_caught} / ${ra.test_failures}</td><td class="n">${ra.false_alerts_per_machine_month}</td></tr>`+
+    `<tr><td>Rule: any alarm in the last 24 h</td><td class="n">-</td><td class="n">${pc(rs.rule_precision)}</td><td class="n">${pc(rs.rule_recall)}</td><td class="n">-</td><td class="n">-</td></tr>`;
+  iRisk.innerHTML=`Only ${rs.base_rate_pct}% of machine-hours precede a breakdown. The sensors-only model catches ${rs.failures_caught_pct}% of breakdowns a day ahead with ${pc(rs.model_precision)} precision, far better than reacting to every alarm (${pc(rs.rule_precision)} precision). With alarms added it is almost perfect, because in this synthetic data alarms nearly always precede failures; expect less on a real plant.`;
+  const im=d.importance.slice(0,8);
+  new Chart(cImp,{type:'bar',data:{labels:im.map(r=>r.feature.replaceAll('_',' ')),datasets:[{data:im.map(r=>r.auc_drop),backgroundColor:C.t}]},options:{plugins:{legend:{display:false}},indexAxis:'y'}});
+  tNow.innerHTML='<tr><th>Machine</th><th class="n">Risk</th><th class="n">Age</th><th class="n">Model</th><th class="n">Days since comp1</th><th class="n">comp2</th><th class="n">comp3</th><th class="n">comp4</th></tr>'+d.risk_now.slice(0,10).map(r=>`<tr><td>M-${r.machineID}</td><td class="n">${pc(r.risk)}</td><td class="n">${r.age}</td><td class="n">${r.model_no}</td><td class="n">${fmt(r.days_since_comp1)}</td><td class="n">${fmt(r.days_since_comp2)}</td><td class="n">${fmt(r.days_since_comp3)}</td><td class="n">${fmt(r.days_since_comp4)}</td></tr>`).join('');
+
+  const pv=p=>p<0.001?'< 0.001':p.toFixed(3);
+  tTests.innerHTML='<tr><th>Hypothesis</th><th>Test</th><th>Result</th><th class="n">p-value</th><th>Conclusion</th></tr>'+d.tests.map(t=>`<tr><td>${t.hypothesis}</td><td>${t.test}</td><td>${t.result}</td><td class="n">${pv(t.p_value)}</td><td class="${t.conclusion==='Supported'?'yes':'no'}">${t.conclusion}</td></tr>`).join('');
+  nReg.innerHTML=`Breakdowns per machine in 2015 on age, error alarms and model (pseudo R² = ${h.poisson_pseudo_r2}). A rate ratio of 1.03 means 3% more failures.`;
+  tReg.innerHTML='<tr><th>Factor</th><th class="n">Rate ratio</th><th class="n">95% CI</th><th class="n">p</th></tr>'+d.regression.map(r=>`<tr><td>${r.factor}</td><td class="n">${fmt(r.rate_ratio,3)}</td><td class="n">${fmt(r.ci_low,2)} to ${fmt(r.ci_high,2)}</td><td class="n">${pv(r.p_value)}</td></tr>`).join('');
+
+  const q=d.quality, ql={telemetry_rows:'Hourly sensor readings',telemetry_duplicates:'Duplicate readings',telemetry_missing_values:'Missing sensor values',telemetry_hours_missing:'Missing hours',failures:'Breakdowns',errors:'Error alarms',maintenance_records:'Maintenance records',maintenance_before_telemetry_starts:'Maintenance before 2015 (history only)',maintenance_after_failure:'Repairs at the hour of a failure',planned_maintenance:'Planned replacements',machines_without_failures:'Machines with no breakdowns'};
+  tQ.innerHTML='<tr><th>Check</th><th class="n">Count</th></tr>'+Object.keys(ql).map(k=>`<tr><td>${ql[k]}</td><td class="n">${fmt(q[k])}</td></tr>`).join('')+`<tr><td>Hours of day breakdowns are logged at</td><td class="n">${Object.entries(q.failure_hours_logged).map(([k,v])=>k+':00 ('+v+')').join(', ')}</td></tr>`;
+  const al={repair_hours_per_failure:'Repair time per breakdown (hours)',stop_hours_per_error:'Stop per error alarm (hours)',planned_maintenance_hours:'Planned replacement (hours, excluded from planned time)',units_per_hour_at_rated_speed:'Ideal output at rated speed (units/hour)',rated_speed_percentile:'Rated speed = percentile of healthy speed',slow_running_percentile:'Slow running = below this percentile',out_of_spec_sigma:'Scrap hour = a process sensor beyond (sigma)',healthy_gap_hours:'Healthy = this many hours from a failure'};
+  tA.innerHTML='<tr><th>Assumption</th><th class="n">Value</th></tr>'+Object.keys(al).map(k=>`<tr><td>${al[k]}</td><td class="n">${h.assumptions[k]}</td></tr>`).join('');
+});
+document.querySelectorAll('#tabs button').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x===b));
+  ['oee','downtime','reliability','risk','stats','data'].forEach(id=>document.getElementById(id).classList.toggle('hide',id!==b.dataset.t));
+}));
+</script>
+</body>
+</html>

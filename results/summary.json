@@ -1,0 +1,138 @@
+{
+  "headline": {
+    "availability": 0.99,
+    "performance": 0.986,
+    "quality": 0.9814,
+    "oee": 0.958,
+    "planned_hours": 872627.0,
+    "run_hours": 863861.0,
+    "output": 85179806.5318,
+    "good_output": 83597887.1636,
+    "scrap": 1581919.3682,
+    "defect_rate": 0.0186,
+    "downtime_hours": 8766,
+    "breakdown_hours": 5187,
+    "minor_stop_hours": 3579,
+    "planned_maintenance_hours": 3473,
+    "failures": 761,
+    "mtbf_hours": 1135.0,
+    "machines": 100,
+    "breakdown_share_of_downtime_pct": 59.3,
+    "top_downtime_cause": "Breakdown: comp2",
+    "top_downtime_cause_pct": 20.5,
+    "losses_top": "Scrap (out-of-spec running)",
+    "machines_for_half_of_losses": 45,
+    "mtbf_by_component_hours": {
+      "comp2": 3335.0,
+      "comp1": 4499.0,
+      "comp4": 4826.0,
+      "comp3": 6594.0
+    },
+    "mtbf_by_model_hours": {
+      "model1": 729.0,
+      "model2": 873.0,
+      "model3": 1369.0,
+      "model4": 1513.0
+    },
+    "median_hours_between_failures": 720.0,
+    "days_since_replacement_at_failure": 75.0,
+    "days_since_replacement_planned": 30.0,
+    "scrap_rate_normal_pct": 1.51,
+    "scrap_rate_near_failure_pct": 4.69,
+    "repeat_failure_share_pct": 95.0,
+    "risk_sensors": {
+      "roc_auc": 0.9988,
+      "pr_auc": 0.9087,
+      "base_rate_pct": 1.83,
+      "model_precision": 0.858,
+      "model_recall": 0.941,
+      "rule_precision": 0.194,
+      "rule_recall": 1.0,
+      "test_failures": 180,
+      "failures_caught": 178,
+      "failures_caught_pct": 98.9,
+      "median_warning_hours": 24.0,
+      "false_alerts_per_machine_month": 0.7,
+      "train_rows": 193400,
+      "test_rows": 73900
+    },
+    "risk_alarms": {
+      "roc_auc": 1.0,
+      "pr_auc": 0.9979,
+      "base_rate_pct": 1.83,
+      "model_precision": 0.991,
+      "model_recall": 0.989,
+      "rule_precision": 0.194,
+      "rule_recall": 1.0,
+      "test_failures": 180,
+      "failures_caught": 180,
+      "failures_caught_pct": 100.0,
+      "median_warning_hours": 24.0,
+      "false_alerts_per_machine_month": 0.04,
+      "train_rows": 193400,
+      "test_rows": 73900
+    },
+    "risk_threshold": 0.42,
+    "poisson_pseudo_r2": 0.624,
+    "reactive_share_pct": 25.7,
+    "assumptions": {
+      "repair_hours_per_failure": 8,
+      "stop_hours_per_error": 1,
+      "planned_maintenance_hours": 2,
+      "units_per_hour_at_rated_speed": 100,
+      "rated_speed_percentile": 50,
+      "slow_running_percentile": 5,
+      "out_of_spec_sigma": 3,
+      "healthy_gap_hours": 72
+    }
+  },
+  "quality": {
+    "telemetry_rows": 876100,
+    "telemetry_duplicates": 0,
+    "telemetry_missing_values": 0,
+    "telemetry_hours_missing": 0,
+    "maintenance_records": 3286,
+    "maintenance_before_telemetry_starts": 400,
+    "failures": 761,
+    "errors": 3919,
+    "maintenance_after_failure": 743,
+    "planned_maintenance": 2543,
+    "machines": 100,
+    "machines_without_failures": 2,
+    "period": "2015-01-01 to 2016-01-01",
+    "failure_hours_logged": {
+      "6": 743,
+      "3": 18
+    }
+  },
+  "tests": [
+    {
+      "hypothesis": "Older machines fail more often",
+      "test": "Spearman rank correlation",
+      "result": "rho = 0.50",
+      "p_value": 1.1058930025500012e-07,
+      "conclusion": "Supported"
+    },
+    {
+      "hypothesis": "Failure frequency differs by machine model",
+      "test": "Kruskal-Wallis H",
+      "result": "model1: 11.8/yr, model2: 9.9/yr, model3: 6.3/yr, model4: 5.7/yr",
+      "p_value": 6.231892520186659e-09,
+      "conclusion": "Supported"
+    },
+    {
+      "hypothesis": "Components that fail have gone longer since their last replacement",
+      "test": "Mann-Whitney U (one-sided)",
+      "result": "median 75 days before a failure vs 30 at planned replacement",
+      "p_value": 2.46043377540289e-118,
+      "conclusion": "Supported"
+    },
+    {
+      "hypothesis": "Scrap is more likely in the 3 days around a failure",
+      "test": "Chi-square test of independence",
+      "result": "4.7% vs 1.5% of hours (3.1x)",
+      "p_value": 0.0,
+      "conclusion": "Supported"
+    }
+  ]
+}

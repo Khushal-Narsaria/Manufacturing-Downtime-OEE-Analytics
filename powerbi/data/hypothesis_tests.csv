@@ -1,0 +1,5 @@
+hypothesis,test,result,p_value,conclusion
+Older machines fail more often,Spearman rank correlation,rho = 0.50,1.1058930025500012e-07,Supported
+Failure frequency differs by machine model,Kruskal-Wallis H,"model1: 11.8/yr, model2: 9.9/yr, model3: 6.3/yr, model4: 5.7/yr",6.231892520186659e-09,Supported
+Components that fail have gone longer since their last replacement,Mann-Whitney U (one-sided),median 75 days before a failure vs 30 at planned replacement,2.46043377540289e-118,Supported
+Scrap is more likely in the 3 days around a failure,Chi-square test of independence,4.7% vs 1.5% of hours (3.1x),0.0,Supported
