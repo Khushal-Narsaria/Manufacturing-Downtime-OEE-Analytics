@@ -4,7 +4,7 @@
 ![python](https://img.shields.io/badge/python-3.12-blue)
 ![sql](https://img.shields.io/badge/SQL-SQLite-lightgrey)
 ![stats](https://img.shields.io/badge/stats-SciPy_%7C_statsmodels-0f6f6a)
-![powerbi](https://img.shields.io/badge/Power_BI-data_model-f2c811)
+![powerbi](https://img.shields.io/badge/Power_BI-dashboard-f2c811)
 
 **Business problem:** why are machines losing productive time, and which failures cause the most downtime?
 
@@ -120,7 +120,13 @@ The strongest inputs are the days since each component was replaced, then speed 
 
 The [live dashboard](https://khushal-narsaria.github.io/Manufacturing-Downtime-OEE-Analytics/) has six pages: OEE and recommendations, downtime Pareto, reliability and patterns, the risk forecast and inspection list, statistics, and data checks with assumptions.
 
-**Power BI:** `powerbi/data/` holds the model (`fact_machine_day`, `dim_machine`, `fact_events`, loss tree, Pareto, risk scores, tests), [`powerbi/measures.dax`](powerbi/measures.dax) the DAX measures, and [`powerbi/POWERBI_GUIDE.md`](powerbi/POWERBI_GUIDE.md) the report pages for production managers.
+### Power BI report
+
+[`powerbi/Manufacturing_OEE_Dashboard.pbix`](powerbi/Manufacturing_OEE_Dashboard.pbix) is the production manager's view in Power BI Desktop: KPI cards (OEE, availability, performance, quality, downtime hours, MTBF, output, defect rate), OEE by month, the downtime Pareto, the OEE loss tree and the 24-hour breakdown-risk inspection list. The model links `dim_machine` to `fact_machine_day` and `risk_scores` on `machineID`; the measures are written in DAX.
+
+![Power BI dashboard](docs/img/powerbi_dashboard.png)
+
+`powerbi/data/` holds the model tables, [`powerbi/measures.dax`](powerbi/measures.dax) the full measure set, and [`powerbi/POWERBI_GUIDE.md`](powerbi/POWERBI_GUIDE.md) how to rebuild or extend the report.
 
 ## Run it
 
